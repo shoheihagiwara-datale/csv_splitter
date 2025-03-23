@@ -42,6 +42,7 @@
       progressText.innerText = '行数をカウント中...';
 
       // 1パス目：行数をカウント
+      const headers = undefined;
       const totalRows = await new Promise(resolve => {
         let count = 0;
         Papa.parse(file, {
@@ -56,7 +57,10 @@
             }
 
           },
-          complete: function() { resolve(count); }
+          complete: function(results) {
+            headers = results.meta.fields;
+            resolve(count);
+          }
         });
       });
       // const totalRows = 77372107;
@@ -73,7 +77,8 @@
         if (buffer.length === 0) return;
 
         const csvString = Papa.unparse(buffer, {
-          quotes: true // ダブルクオーテーション保持
+          quotes: true, // ダブルクオーテーション保持
+          columns: headers,
         });
 
         const baseFileName = file.name.replace(/\.csv$/i, '');
