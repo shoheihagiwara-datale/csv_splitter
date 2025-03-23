@@ -19,7 +19,7 @@
     async function splitCSV() {
 
       const splitCsvButton = document.getElementById('splitCsvButton');
-      splitCsvButton.disable = true;
+      splitCsvButton.disabled = true;
 
       if (!window.showDirectoryPicker) {
         alert("この機能は Chrome 86+ などの File System Access API 対応ブラウザでのみ利用できます。");
@@ -42,14 +42,17 @@
       progressText.innerText = '行数をカウント中...';
 
       // 1パス目：行数をカウント
-      const headers = undefined;
+      let headers = undefined;
       const totalRows = await new Promise(resolve => {
         let count = 0;
         Papa.parse(file, {
           header: true,
           skipEmptyLines: false,
           worker: true,
-          step: function() {
+          step: function(results) {
+            if (!headers) {
+              headers = results.meta.fields;
+            }
             count++;
 
             if (count % 50000 === 0) {
@@ -57,8 +60,7 @@
             }
 
           },
-          complete: function(results) {
-            headers = results.meta.fields;
+          complete: function() {
             resolve(count);
           }
         });
@@ -76,10 +78,23 @@
       const writeChunkToFile = async () => {
         if (buffer.length === 0) return;
 
-        const csvString = Papa.unparse(buffer, {
-          quotes: true, // ダブルクオーテーション保持
-          columns: headers,
-        });
+        // const csvString = Papa.unparse(buffer, {
+        //   quotes: true, // ダブルクオーテーション保持
+        //   header: true,
+        //   fields: headers,
+        // });
+        let csvString = Papa.unparse({
+            "fields": headers,
+            "data": buffer,
+          }, {
+            quotes: true, // ダブルクオーテーション保持
+            header: true,
+          });
+
+        // 改行(\r\n)終わりでない場合追加する
+        if (!csvString.endsWith('\r\n')) {
+          csvString = csvString + '\r\n';
+        }
 
         const baseFileName = file.name.replace(/\.csv$/i, '');
         const fileName = `${baseFileName}_part_${fileIndex}.csv`
@@ -96,12 +111,17 @@
 
 
       // ✅ 2. CSVを1行ずつ処理
+      let isFirstLine = true;
       Papa.parse(file, {
-        header: true,
-        skipEmptyLines: false,
+        // header: true, // https://github.com/mholt/PapaParse/issues/998 の対応のためにコメントアウト
+        skipEmptyLines: true,
         step: async function (results, parser) {
           // console.log(results.data);
           // const row = results.data.join(',') + '\n';
+          if (isFirstLine) {
+            isFirstLine = false;
+            return;
+          }
           buffer.push(results.data);
 
           if (buffer.length % 100000 == 0) {
@@ -124,7 +144,7 @@
           completeMsg = "全ファイルの書き込みが完了しました！";
           progressText.innerText = completeMsg
           alert(completeMsg);
-          splitCsvButton.disable = false;
+          splitCsvButton.disabled = false;
         },
         error: function (err) {
           console.error("エラー:", err);
