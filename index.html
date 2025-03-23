@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <title>CSV分割ツール</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+
+<body>
+  <h1>CSV分割ツール</h1>
+  <input type="file" id="csvFile" accept=".csv"><br><br>
+  分割するファイル数：<input type="number" id="fileCount" min="1" value="10"><br><br>
+  <button id="splitCsvButton" onclick="splitCSV()">フォルダに分割保存</button>
+
+  <div id="progressText" style="text-align:center;"></div>
+
+  <script>
+    async function splitCSV() {
+
+      const splitCsvButton = document.getElementById('splitCsvButton');
+      splitCsvButton.disable = true;
+
+      if (!window.showDirectoryPicker) {
+        alert("この機能は Chrome 86+ などの File System Access API 対応ブラウザでのみ利用できます。");
+        return;
+      }
+
+      // ✅ 1. ユーザーにディレクトリ選択させる
+      const dirHandle = await window.showDirectoryPicker();
+
+      const fileInput = document.getElementById('csvFile');
+      const file = fileInput.files[0];
+      const fileCount = parseInt(document.getElementById('fileCount').value);
+      const progressText = document.getElementById('progressText');
+
+      if (!file || fileCount < 1) {
+        alert("CSVファイルと分割数を指定してください。");
+        return;
+      }
+
+      progressText.innerText = '行数をカウント中...';
+
+      // 1パス目：行数をカウント
+      const totalRows = await new Promise(resolve => {
+        let count = 0;
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: false,
+          worker: true,
+          step: function() {
+            count++;
+
+            if (count % 50000 === 0) {
+              progressText.innerText = `行数をカウント： ${count} 行...`;
+            }
+
+          },
+          complete: function() { resolve(count); }
+        });
+      });
+      // const totalRows = 77372107;
+
+      const rowsPerFile = Math.ceil(totalRows / fileCount);
+      progressText.innerText = `合計 ${totalRows} 行 → 約 ${rowsPerFile} 行ずつに分割`;
+
+
+      let buffer = [];
+      let fileIndex = 1;
+      const chunkSize = 10000;
+
+      const writeChunkToFile = async () => {
+        if (buffer.length === 0) return;
+
+        const csvString = Papa.unparse(buffer, {
+          quotes: true // ダブルクオーテーション保持
+        });
+
+        const baseFileName = file.name.replace(/\.csv$/i, '');
+        const fileName = `${baseFileName}_part_${fileIndex}.csv`
+
+        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(csvString);
+        await writable.close();
+        console.log(`${fileName} 書き込み完了`);
+        buffer = [];
+        fileIndex++;
+      };
+
+
+
+      // ✅ 2. CSVを1行ずつ処理
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: false,
+        step: async function (results, parser) {
+          // console.log(results.data);
+          // const row = results.data.join(',') + '\n';
+          buffer.push(results.data);
+
+          if (buffer.length % 100000 == 0) {
+            console.log(`rowsPerFile: ${rowsPerFile}, buffer.length: ${buffer.length}`);
+            progressText.innerText = `処理中： ${buffer.length} / ${totalRows} 行`;
+
+          }
+
+          if (buffer.length >= rowsPerFile) {
+            parser.pause(); // 一時停止して書き込みを待つ
+            await writeChunkToFile();
+            buffer = []
+            parser.resume(); // 再開
+          }
+        },
+        complete: async function () {
+          if (buffer.length > 0) {
+            await writeChunkToFile();
+          }
+          completeMsg = "全ファイルの書き込みが完了しました！";
+          progressText.innerText = completeMsg
+          alert(completeMsg);
+          splitCsvButton.disable = false;
+        },
+        error: function (err) {
+          console.error("エラー:", err);
+        }
+      });
+    }
+
+  </script>
+</body>
+
+</html>
