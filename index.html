@@ -28,6 +28,12 @@
 
       // ✅ 1. ユーザーにディレクトリ選択させる
       const dirHandle = await window.showDirectoryPicker();
+      // 必要なら明示的にパーミッション取得
+      const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
+      if (permission !== 'granted') {
+        alert('フォルダへの書き込み権限が必要です。');
+        return;
+      }
 
       const fileInput = document.getElementById('csvFile');
       const file = fileInput.files[0];
@@ -100,7 +106,6 @@
         const fileName = `${baseFileName}_part_${fileIndex}.csv`
 
         const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-        await fileHandle.requestPermission({'mode': 'readwrite'});
         const writable = await fileHandle.createWritable();
         await writable.write(csvString);
         await writable.close();
