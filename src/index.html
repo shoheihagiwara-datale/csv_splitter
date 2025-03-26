@@ -62,7 +62,7 @@
             count++;
 
             if (count % 50000 === 0) {
-              progressText.innerText = `行数をカウント： ${count} 行...`;
+              progressText.innerText = `行数をカウント： ${Intl.NumberFormat('en-US').format(count)} 行...`;
             }
 
           },
@@ -74,7 +74,7 @@
       // const totalRows = 77372107;
 
       const rowsPerFile = Math.ceil(totalRows / fileCount);
-      progressText.innerText = `合計 ${totalRows} 行 → 約 ${rowsPerFile} 行ずつに分割`;
+      progressText.innerText = `合計 ${Intl.NumberFormat('en-US').format(totalRows)} 行 → 約 ${Intl.NumberFormat('en-US').format(rowsPerFile)} 行ずつに分割`;
 
 
       let buffer = [];
@@ -132,7 +132,7 @@
 
           if (buffer.length % 100000 == 0) {
             console.log(`rowsPerFile: ${rowsPerFile}, buffer.length: ${buffer.length}`);
-            progressText.innerText = `処理中： ${buffer.length} / ${totalRows} 行`;
+            progressText.innerText = `処理中： ${Intl.NumberFormat('en-US').format(buffer.length)} / ${Intl.NumberFormat('en-US').format(totalRows)} 行`;
 
           }
 
